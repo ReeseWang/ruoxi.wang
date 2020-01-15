@@ -6,9 +6,9 @@
 
 PHICOMM R1 is a smart speaker whose cloud service had been shutdown and not 'smart' anymore so I'm able to get an unused one for about $11 in China. It comes with Android 5.1, 5GHz WiFi and an open network ADB port, which make it a decent wireless speaker node.
 
-Today we're going to setup a 5.1 wireless surround speaker system for a PC (running Windows) with 6 PHICOMM R1 speakers.
+Today we're going to set up a 5.1 wireless surround speaker system for a PC (running Windows) with 6 PHICOMM R1 speakers.
 
-While multicast works well in wired network, [multicast in WiFi has several limitations](https://en.wikipedia.org/wiki/IP_multicast#Wireless_(802.11)_considerations) that make me turn to unicast instead. First, for most of the time wireless AP can't transmit multicast packets continuously and bandwidth is limited; Second, multicast packets don't have retransmission mechanism so that they are prone to data loss, which is unbearable in our case.
+While multicast works well in wired networks, [multicast in WiFi has several limitations](https://en.wikipedia.org/wiki/IP_multicast#Wireless_(802.11)_considerations) that make me turn to unicast instead. First, for most of the time, wireless AP can't transmit multicast packets continuously and bandwidth is limited; Second, multicast packets don't have retransmission mechanisms so that they are prone to data loss, which is unbearable in our case.
 
 So I created a fork on my [GitHub](https://github.com/ReeseWang/scream) to add the functionality of splitting multi-channel audio over multiple destinations (e.g. Front Left and Front Center to 192.168.0.2, while Front Center and Front Right to 192.168.0.3).
 
@@ -52,7 +52,7 @@ Launch Visual Studio Installer and make sure something similar to *MSVC v142 - V
 
 Start Visual Studio and open `Scream.sln`, Click **Build -> Build Solution** to build our driver file. There are 3 files generated: `scream.cat`, `Scream.inf` and `Scream.sys`.
 
-The build process should complete without error. If the linker complains about undefined reference, right click **Scream (in the Solution Explorer) -> Properties -> Configuration Properties -> Linker -> Input -> Additional Dependencies** and add 3 libraries:
+The build process should complete without error. If the linker complains about undefined reference, right-click **Scream (in the Solution Explorer) -> Properties -> Configuration Properties -> Linker -> Input -> Additional Dependencies** and add 3 libraries:
 
 ```bash
 $(DDK_LIB_PATH)portcls.lib
@@ -133,7 +133,7 @@ Now we have 6 'smart' speakers running, the sight of them being activated simult
 
 Thanks to the tip provided [here](https://www.maketecheasier.com/uninstall-system-apps-without-root-android/), we can remove the annoying voice assistant without rooting the device.
 
-A bit of warning: You won't be able to modify network settings of R1 via their APP after uninstalling the voice assistant. OTA updating after uninstalling will brick the device, so it's recommanded to update to latest version (3448) before uninstalling the voice assistant. For performing OTA update, look for posts in this [forum](https://www.right.com.cn/forum/forum.php?mod=forumdisplay&fid=158&filter=typeid&typeid=42) (Chinese).
+A bit of warning: You won't be able to modify network settings of R1 via their APP after uninstalling the voice assistant. OTA updating after uninstalling will brick the device, so it's recommended to update to the latest version (3448) before uninstalling the voice assistant. For performing OTA updates, look for posts in this [forum](https://www.right.com.cn/forum/forum.php?mod=forumdisplay&fid=158&filter=typeid&typeid=42) (Chinese).
 
 The command for removing the stock voice assistant is here:
 
@@ -145,7 +145,7 @@ The command for removing the stock voice assistant is here:
 
 Launch **Control Panel -> Hardware and Sound -> Sound -> Scream (WDM) -> Properties -> Advanced -> Default Format**, select *16 bit, 44100 Hz* or *16 bit, 48000 Hz* here and hit OK, as scream-android doesn't support higher bit depth or sample rate.
 
-Click **Configure** in the Sound dialogue, choose 5.1 surround with side speakers and complete the Speaker Setup. If you want to use 5.1 surround with rear speakers, make sure to change the endpoint channel mask accordingly.
+Click **Configure** in the Sound dialogue, choose 5.1 Surround with side speakers and complete the Speaker Setup. If you want to use 5.1 Surround with rear speakers, make sure to change the endpoint channel masks accordingly.
 
 ![Configure Surround Sound](imgs/surround-settings.png)
 
