@@ -1,7 +1,3 @@
----
-typora-root-url: ./
----
-
 # Wireless Surround Speaker System with Scavenged Smart Speakers and Open Source Software
 
 (There are so many 'S's in the title.)
@@ -22,7 +18,7 @@ So I created a fork on my [GitHub](https://github.com/ReeseWang/scream) to add t
 
 At the time of writing (commit [090f873](https://github.com/ReeseWang/scream/commit/090f873436da0f55cf7918c6c6735fa4ea47e600)), destination(endpoint) info is hard-coded in `Scream/savedata.cpp` temporarily. So you should change the constructor of `CSaveData` class and some array declarations in `CSaveData::Initialize` to suit your environment:
 
-```c++
+```
 CSaveData::CSaveData() : m_bNumEndPoints(6), ...
 {
     ...
@@ -159,7 +155,7 @@ I created aliases in Bash for remote controlling 6 speakers simultaneously from 
 
 ```bash
 # Connect All R1s via ADB
-alias r1connectall="for ((i=1;i<=6	;i+=1)); do adb connect 192.168.90.24\$i; done"
+alias r1connectall="for ((i=1;i<=6;i+=1)); do adb connect 192.168.90.24\$i; done"
 # Execute ADB command on all R1 devices
 alias adball="adb devices -l | grep rk322x_box | rev | cut -f 1 -d ' ' | rev | cut -f 2 -d : | xargs -P 0 -I transid adb -t transid"
 # Launch scream-android on all R1s
