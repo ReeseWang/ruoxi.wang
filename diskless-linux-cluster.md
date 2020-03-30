@@ -37,6 +37,13 @@ The file is another larger piece of code called [boot loader](https://wiki.archl
 
 The kernel is a much larger piece of code. It uses the initramfs as a temporary root file system and runs the `/init` program in it (as a process instead of letting it take over the execution). `/init` then mounts an [Network File System (NFS)](https://en.wikipedia.org/wiki/Network_File_System), provided by the server, to `/new_root` and mounts another NFS to `/new_root/etc`. Finally the kernel use `/new_root` as the root file system and run `/init` in it. `/init` will then start many background processes and show a login prompt to the user. This concludes the boot process of a diskless client machine.
 
+These are the methods we use to let clients share the same root file system while have different configurations:
+
+* The root file system can only be mounted as read-only by clients. This is for preventing clients from garbling the root file system.
+* We create a [tmpfs](https://en.wikipedia.org/wiki/Tmpfs) and put it on top of our read-only root to form an [OverlayFS](https://en.wikipedia.org/wiki/OverlayFS). By this we make the root read-write so that programs won't refuse to work due to not able to write a file. The changes are lost upon client reboot though.
+* Every client mounts its own NFS on `/etc` as read-write in the initramfs stage so that they can have different enabled systemd services, different SSH server keys, etc. We use [git](https://en.wikipedia.org/wiki/Git) to track changes in these `/etc` directories so that if you want to make a change across all clients, just commit the changes in the upstream `/etc` and do `git-pull`s in downstream `/etc` directories.
+* One client can have persistent write access to its `/boot` (thus all clients' `/boot`) to make its own initramfs image in case that the hardwares differ between the server and clients.
+
 ## Let's Do It!
 
 ### Set up a DHCP/TFTP/DNS server with dnsmasq
@@ -136,7 +143,7 @@ Change root into the new system:
 # arch-chroot /mnt/root
 ```
 
-Now set the time zone, localization, root password and other things described in [Arch Wiki](https://wiki.archlinux.org/index.php/Installation_guide#Configure_the_system). But don't touch `/etc/hostname`, `/etc/hosts` and initramfs for the time being.
+Now set the time zone, localization, root password and other things described in [Arch Wiki](https://wiki.archlinux.org/index.php/Installation_guide#Configure_the_system). But don't touch `/etc/fstab`, `/etc/hostname`, `/etc/hosts` and initramfs for the time being.
 
 In the chroot environment, install `openssh` and enable `sshd.service` if you need it:
 
@@ -145,10 +152,10 @@ chroot# pacman -S openssh
 chroot# systemctl enable sshd
 ```
 
-Create a user with sudo permission, and set its password. You can make this user's GID and UID identical to the user you use on the server machine, for more convenience later on.
+Create a user with sudo permission, and set its password. You can make this user's UID identical to the user you use on the server machine, for more convenience later on.
 
 ```
-chroot# useradd --create-home --groups wheel --gid 1001 --uid 1001 wangruoxi
+chroot# useradd --create-home --groups wheel --uid 1001 wangruoxi
 chroot# passwd wangruoxi
 ```
 
@@ -161,7 +168,7 @@ chroot# visudo
 Create `(chroot)/etc/systemd/network/00-wired.network`:
 
 ```toml
-openssh[Match]
+[Match]
 Name=eth0
 
 [Network]
@@ -172,7 +179,7 @@ IgnoreCarrierLoss=yes
 
 Use `Ctrl+D` to exit the chroot environment.
 
-Now we export this file system as an NFS. Make sure `nfs-utils` is installed and Edit `/etc/exports` to add the following line:
+Now we export this file system as an NFS. Make sure `nfs-utils` is installed and add the following line to  `/etc/exports`:
 
 ```
 /srv/root    192.168.78.0/24(ro,no_root_squash,subtree_check)
@@ -189,7 +196,7 @@ Enable NFS server and re-export NFS shares:
 
 #### Boot loader executables
 
-We installed `syslinux` in the `pacstrap` step because we need a boot loader provided by it. The boot loader is `pxelinux`. Copy some files used by `pxelinux` to `/srv/root/boot` folder as symlinks. Thes files will be transferred to client machines via TFTP during their boot process. We use symlinks here so that these files will be automatically updated whenever `syslinux` gets an update. These symlinks have relative target paths in case `/srv/root` need to move to another location.
+We installed `syslinux` in the `pacstrap` step because we need a boot loader provided by it. The boot loader is `pxelinux`. Copy some files used by `pxelinux` to `/srv/root/boot` folder as symlinks. Thes files will be transferred to client machines via TFTP during their boot process. We use symlinks here so that these files will be automatically updated whenever `syslinux` gets an update. These symlinks have relative target paths in case `/srv/root` needs to be moved to another location.
 
 ```
 # cd /srv/root/boot
@@ -205,7 +212,7 @@ DEFAULT linux
 
 LABEL linux
 	KERNEL vmlinuz-linux
-	APPEND root=/dev/nfs nfsroot=192.168.78.1:/srv/root ip=dhcp ro elevator=deadline rootwait
+	APPEND root=/dev/nfs nfsroot=192.168.78.1:/srv/root,ro ip=dhcp elevator=deadline rootwait
 	INITRD intel-ucode.img,initramfs-linux-fallback.img
 ```
 
@@ -215,33 +222,100 @@ We use `initramfs-linux-fallback.img` for now because the non-fall-back initramf
 
 #### initramfs
 
-By default, Arch Linux initramfs don't have functionalities to mount NFS. So we need 3 packages from AUR to add this functionality.
+By default, Arch Linux initramfs don't have functionalities to mount NFS. So we need `mkinitcpio-nfs-utils` to add them:
 
-Fetch PKGBUILDs of `mkinitcpio-nfs4-hooks`, `mkinitcpio-overlayfs` and `mkinitcpio-etc` from AUR, build packages and install them to clients' root file system. Just copy this 'for' loop to your terminal and hit Enter. Error messages from `pacman` hooks are expected since we aren't installing packages to the running system.
+```
+# arch-chroot /mnt/root pacman -S mkinitcpio-nfs-utils
+```
+
+There are another 2 packages we need: `mkinitcpio-overlayfs` and `mkinitcpio-etc`. They are in the [Arch User Repository](https://wiki.archlinux.org/index.php/Arch_User_Repository). Fetch their PKGBUILDs from AUR and build packages. Just copy this 'for' loop to your terminal and hit Enter.
 
 ```bash
 #!/bin/bash
 
-for pkg in mkinitcpio-nfs4-hooks mkinitcpio-overlayfs mkinitcpio-etc; do
+for pkg in mkinitcpio-overlayfs mkinitcpio-etc; do
 	git clone https://aur.archlinux.org/$pkg.git
 	cd $pkg
 	makepkg
-	sudo pacman --root /srv/root --dbpath /srv/root/var/lib/pacman -U *.pkg.tar.xz
+	sudo cp *.pkg.tar.xz /srv/root/root
 	cd ..
 done
+```
+
+Install them to the clients' root file system:
+
+```
+# arch-chroot /mnt/root pacman -U /root/*.pkg.tar.xz
 ```
 
 Edit `/srv/root/etc/mkinitcpio.conf` and modify the line begins with `HOOKS=`:
 
 ```bash
 ...
-HOOKS=(base udev autodetect modconf net_nfs4 filesystems keyboard overlayfs etc)
+HOOKS=(base udev autodetect modconf net filesystems keyboard overlayfs etc)
 ...
 ```
 
-Change root into the client root file system and update initramfs images:
+Update initramfs images:
 
 ```
-# arch-chroot /srv/root mkinitcpio -p linux
+# arch-chroot /mnt/root mkinitcpio -p linux
 ```
 
+Note: You should not replace `mkinitcpio-nfs-utils` with `mkinitcpio-nfs4-hooks` because at the time of writing (Linux 5.5.13), OverlayFS don't play along well with NFSv4's ACL. (See [this post](https://blog.fai-project.org/posts/overlayfs/))
+
+### Test if everything works
+
+Now the server is configured to the point where clients can finish the boot process. Connect a client and the server to the same Ethernet switch. Before trying to boot a client machine, make sure PXE boot is supported and enabled in its BIOS.
+
+If you aren't able to hook a monitor to your client machine, you can do these thing to help determining which boot stage it can reach.
+
+* If you installed `openssh` and enabled `sshd.service` in clients' root, try to SSH into it. If the login is successful, we know the client machine boots successfully.
+* Run `showmount` on the server. If you can see client's IP address, the NFS is successfully mounted.
+* Ping the client's IP address. If the client replies, its network configuration is successful.
+* Check `dnsmasq`'s log with `journalctl -eu dnsmasq`. If you see `sent /srv/root/boot/initramfs-linux-fallback.img to xx.xx.xx.xx` in it, the client's boot loader is executed correctly. 
+
+### Give clients their own `/etc` directories
+
+We installed `etckeeper` in the `pacstrap` step. It automatically track changes in `/srv/root/etc` with `git`, for example, when installing packages with `pacman`.
+
+First do some initialization for `etckeeper`:
+
+```
+# arch-chroot /mnt/root
+chroot# etckeeper init
+chroot# cd /etc
+chroot# git config user.name root
+chroot# etckeeper commit -m "Initial commit"
+chroot# exit
+```
+
+Clone the git repository in `/srv/root/etc/.git` for every client with this one-liner:
+
+```bash
+for i in {0..5}; do sudo git clone /srv/root/etc/.git /srv/etc-client$i; done
+```
+
+Grow our `/etc/exports` to be like this and re-export with `sudo exportfs -arv`:
+
+```
+/srv/root    192.168.78.0/24(ro,no_root_squash,subtree_check)
+/srv/etc-client0	192.168.78.50/24(rw,no_root_squash,subtree_check)
+/srv/etc-client1	192.168.78.51/24(rw,no_root_squash,subtree_check)
+/srv/etc-client2	192.168.78.52/24(rw,no_root_squash,subtree_check)
+/srv/etc-client3	192.168.78.53/24(rw,no_root_squash,subtree_check)
+/srv/etc-client4	192.168.78.54/24(rw,no_root_squash,subtree_check)
+/srv/etc-client5	192.168.78.55/24(rw,no_root_squash,subtree_check)
+```
+
+Modify `/srv/root/boot/pxelinux.cfg/default` so that clients will mount their own `/etc`s:
+
+```
+...
+	APPEND root=/dev/nfs nfsroot=192.168.78.1:/srv/root,ro ip=dhcp elevator=deadline rootwait etc=192.168.78.1:/srv/etc-HOSTNAME
+...
+```
+
+Mounting `/etc` is performed by the initramfs hook provided by `mkinitcpio-etc`. It will replace `HOSTNAME` with the host-names each client received from `dnsmasq`.
+
+Now connect all 6 clients to the Ethernet switch and boot them up. If 
