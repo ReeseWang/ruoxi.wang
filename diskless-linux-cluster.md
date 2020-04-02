@@ -50,7 +50,7 @@ These are the methods we use to let clients share the same root file system whil
 
 Suppose the server machine has the static IP address 192.168.78.1/24 on its interface dedicated to this cluster. You may use a network manager to assign this static IP. Say if you use `systemd-networkd`, create `/etc/systemd/network/00-eth0.network` as follows should do the job:
 
-```toml
+```ini
 [Match]
 Name=eth0
 
@@ -167,7 +167,7 @@ chroot# visudo
 
 Create `(chroot)/etc/systemd/network/00-wired.network`:
 
-```toml
+```ini
 [Match]
 Name=eth0
 
