@@ -2,7 +2,7 @@
 
 ## Intro
 
-A diskless computer is a computer, as the name suggests, without disks. Typically it will grab the programs it needs to run over a network instead of a dedicated storage device. A diskless cluster consists of multiple diskless computers, often share the same hardware configuration, and a "disked" server computer who provide data needed by diskless ones over a network. 
+A diskless computer is a computer, as the name suggests, without disks. Typically it will grab the programs it needs to run over a network instead of a dedicated storage device. A diskless cluster consists of multiple diskless computers, often share the same hardware configuration, and a "disked" server computer that provides data needed by diskless ones over a network. 
 
 In this guide, we are going to set up a diskless cluster where all computers have x86-64 architecture and run Arch Linux. All client computers share the same root file system but each client has its own version of `/etc` directory so that they can have different configurations: one can run in headless mode while another boots into a desktop environment, for example.
 
@@ -35,14 +35,14 @@ After a client machine's BIOS or UEFI finished executing, it will load and execu
 
 The file is another larger piece of code called [boot loader](https://wiki.archlinux.org/index.php/Arch_boot_process#Boot_loader). You may have already known a boot loader called [GRUB](https://wiki.archlinux.org/index.php/GRUB). PXE executes the boot loader, the boot loader first gets its configuration file from the TFTP server. The configuration file stores the path of the [Linux kernel](https://wiki.archlinux.org/index.php/Arch_boot_process#Kernel) and [initramfs](https://wiki.archlinux.org/index.php/Arch_boot_process#initramfs). The boot loader then gets the kernel and initramfs through TFTP, loads them into RAM and executes the kernel with the command line options in the configuration file (imagine the kernel to be a command-line program you run in your terminal). 
 
-The kernel is a much larger piece of code. It uses the initramfs as a temporary root file system and runs the `/init` program in it (as a process instead of letting it take over the execution). `/init` then mounts an [Network File System (NFS)](https://en.wikipedia.org/wiki/Network_File_System), provided by the server, to `/new_root` and mounts another NFS to `/new_root/etc`. Finally the kernel use `/new_root` as the root file system and run `/init` in it. `/init` will then start many background processes and show a login prompt to the user. This concludes the boot process of a diskless client machine.
+The kernel is a much larger piece of code. It uses the initramfs as a temporary root file system and runs the `/init` program in it (as a process instead of letting it take over the execution). `/init` then mounts a [Network File System (NFS)](https://en.wikipedia.org/wiki/Network_File_System), provided by the server, to `/new_root` and mounts another NFS to `/new_root/etc`. Finally the kernel use `/new_root` as the root file system and run `/init` in it. `/init` will then start many background processes and show a login prompt to the user. This concludes the boot process of a diskless client machine.
 
-These are the methods we use to let clients share the same root file system while have different configurations:
+These are the methods we use to let clients share the same root file system while having different configurations:
 
 * The root file system can only be mounted as read-only by clients. This is for keeping clients from garbling the root file system.
-* We create a [tmpfs](https://en.wikipedia.org/wiki/Tmpfs) and put it on top of our read-only root to form an [OverlayFS](https://en.wikipedia.org/wiki/OverlayFS). By this we make the root read-write so that programs won't refuse to work due to not able to create a file. The changes are lost upon client reboot though.
-* Every client mounts its own NFS on `/etc` as read-write in the initramfs stage so that they can have different enabled systemd services, different SSH server keys, different user list and/or group list, etc. We use [git](https://en.wikipedia.org/wiki/Git) to track changes in these `/etc` directories so that if you want to make a change across all clients, just commit the changes in the upstream `/etc` and do `git-pull`s in downstream `/etc` directories.
-* One designated client can have persistent write access to its `/boot` (thus all clients' `/boot`) to make its own initramfs image in case that the hardwares differ between the server and clients.
+* We create a [tmpfs](https://en.wikipedia.org/wiki/Tmpfs) and put it on top of our read-only root to form an [OverlayFS](https://en.wikipedia.org/wiki/OverlayFS). By this, we make the root read-write so that programs won't refuse to work due to not able to create a file. The changes are lost upon client reboot though.
+* Every client mounts its own NFS on `/etc` as read-write in the initramfs stage so that they can have different enabled systemd services, different SSH server keys, different user lists and/or group lists, etc. We use [git](https://en.wikipedia.org/wiki/Git) to track changes in these `/etc` directories so that if you want to make a change across all clients, just commit the changes in the upstream `/etc` and do `git-pull`s in downstream `/etc` directories.
+* One designated client can have persistent write access to its `/boot` (thus all clients' `/boot`) to make its own initramfs image in case that the hardware differ between the server and clients.
 
 ## Let's Do It!
 
@@ -274,22 +274,22 @@ Update initramfs images:
 # arch-chroot /mnt/root mkinitcpio -p linux
 ```
 
-Note: You should not replace `net` hook with `net_nfs4` provided by `mkinitcpio-nfs4-hooks` because at the time of writing (Linux 5.5.13), OverlayFS don't play along well with NFSv4's ACL. (See [this post](https://blog.fai-project.org/posts/overlayfs/))
+Note: You should not replace the `net` hook with `net_nfs4` provided by `mkinitcpio-nfs4-hooks` because, at the time of writing (Linux 5.5.13), OverlayFS don't play along well with NFSv4's ACL. (See [this post](https://blog.fai-project.org/posts/overlayfs/))
 
 ### Test if everything works
 
 Now the server is configured to the point where clients can finish the boot process. Connect a client and the server to the same Ethernet switch. Before trying to boot a client machine, make sure PXE boot is supported and enabled in its BIOS.
 
-If you aren't able to hook a monitor to your client machine, you can do these thing to help determining which boot stage it can reach.
+If you aren't able to hook a monitor to your client machine, you can do these thing to help to determine which boot stage it can reach.
 
 * If you installed `openssh` and enabled `sshd.service` in clients' root, try to SSH into it. If the login is successful, we know the client machine boots successfully.
-* Run `showmount` on the server. If you can see client's IP address, the NFS is successfully mounted.
+* Run `showmount` on the server. If you can see the client's IP address, the NFS is successfully mounted.
 * Ping the client's IP address. If the client replies, its network configuration is successful.
 * Check `dnsmasq`'s log with `journalctl -eu dnsmasq`. If you see `sent /srv/root/boot/initramfs-linux-fallback.img to xx.xx.xx.xx` in it, the client's boot loader is executed correctly. 
 
 ### Give clients their own `/etc` directories
 
-We installed `etckeeper` in the `pacstrap` step. It automatically track changes in `/srv/root/etc` with `git`, for example, when installing packages with `pacman`.
+We installed `etckeeper` in the `pacstrap` step. It automatically tracks changes in `/srv/root/etc` with `git`, for example, when installing packages with `pacman`.
 
 First do some initialization for `etckeeper`:
 
