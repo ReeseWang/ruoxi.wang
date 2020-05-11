@@ -189,7 +189,7 @@ You may want to disable Predictable Network Interface Names:
 chroot# mkdir -p /etc/udev/rules.d && ln -s /dev/null /etc/udev/rules.d/80-net-setup-link.rules
 ```
 
-Use `Ctrl+D` to exit the chroot environment.
+Use `{Ctrl}`+`{D}` to exit the chroot environment.
 
 Now we export this file system as an NFS. Make sure `nfs-utils` is installed and add the following line to  `/etc/exports`:
 
@@ -444,8 +444,8 @@ Start `tmux`:
 $ tmux
 ```
 
-Press `Ctrl+A` then `Ctrl+C` to create a window with 6 panes. An SSH client will run in each pane and connect to each client.
+Press `{Ctrl}`+`{A}` then `{Ctrl}`+`{C}` to create a window with 6 panes. An SSH client will run in each pane and connect to each client.
 
-Press `Ctrl+A` then `Ctrl+X` and the window title on the bottom of the screen will become red, showing the window is currently in synchronization mode. All characters typed on the keyboard will be sent to all 6 panes simultaneously in this mode. Press `Ctrl+A` then `Ctrl+X` again to return to normal mode.
+Press `{Ctrl}`+`{A}` then `{Ctrl}`+`{X}` and the window title on the bottom of the screen will become red, showing the window is currently in synchronization mode. All characters typed on the keyboard will be sent to all 6 panes simultaneously in this mode. Press `{Ctrl}`+`{A}` then `{Ctrl}`+`{X}` again to return to normal mode.
 
 For documentation on `tmux`, see `man tmux`.
